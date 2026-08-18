@@ -1,3 +1,8 @@
+---
+tags:
+  - public
+---
+
 # Troubleshooting
 
 Common issues and fixes for your AlphaX XVision deployment.
@@ -11,11 +16,11 @@ Common issues and fixes for your AlphaX XVision deployment.
 
 ## Stream preview won't load
 
-| Cause | Fix |
-|-------|-----|
-| Insufficient bandwidth | Confirm 4 Mbps sustained is available per camera |
-| Browser cache | Hard-refresh the dashboard (Ctrl+Shift+R) |
-| Firewall blocking | Ensure outbound HTTPS (443) is allowed to *.alphax.cloud |
+| Cause                  | Fix                                                       |
+| ---------------------- | --------------------------------------------------------- |
+| Insufficient bandwidth | Confirm 4 Mbps sustained is available per camera          |
+| Browser cache          | Hard-refresh the dashboard (Ctrl+Shift+R)                 |
+| Firewall blocking      | Ensure outbound HTTPS (443) is allowed to \*.alphax.cloud |
 
 ## Motion alerts not firing
 
