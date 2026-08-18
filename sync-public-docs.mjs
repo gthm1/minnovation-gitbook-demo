@@ -2,16 +2,26 @@
 /**
  * sync-public-docs.mjs
  *
- * Keeps acme-corp-public/ in sync with a specific subset of files from
- * acme-corp-internal/, defined in public-pages.json.
+ * Keeps acme-corp-public/ in sync with pages from acme-corp-internal/
+ * that are tagged "public" in GitBook.
  *
- * GitBook's editor does NOT support Markdown frontmatter (it renders it
- * as literal visible text rather than metadata), so we can't tag pages
- * public/internal inside the files themselves. Instead, public-pages.json
- * is the single source of truth for "which internal pages are also
- * public." Anything in acme-corp-internal/ NOT listed there (e.g.
- * account-notes.md, support-history.md) is treated as staff-only and
- * is never copied.
+ * How tagging works: in GitBook's editor, open a page -> Page options ->
+ * Add tags -> add a tag called "public". When that change request is
+ * merged, GitBook's Git Sync exports real YAML frontmatter into the
+ * page's .md file, e.g.:
+ *
+ *   ---
+ *   tags:
+ *     - public
+ *   ---
+ *
+ * This script reads that frontmatter directly. Pages with no "public"
+ * tag (including untagged pages, and pages tagged anything else, e.g.
+ * "internal") are treated as staff-only and are never copied.
+ *
+ * README.md and SUMMARY.md are structural files, not "pages" in the
+ * tagging sense, and are always synced/maintained separately (see notes
+ * below) rather than driven by tags.
  *
  * Usage:
  *   node sync-public-docs.mjs           # sync
@@ -25,26 +35,31 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const INTERNAL_DIR = path.join(__dirname, "acme-corp-internal");
 const PUBLIC_DIR = path.join(__dirname, "acme-corp-public");
-const CONFIG_PATH = path.join(__dirname, "public-pages.json");
 const CHECK_ONLY = process.argv.includes("--check");
 
-// SUMMARY.md is hand-maintained separately per folder (page order/tree
-// can legitimately differ between internal and public), so it's never
-// auto-synced by this script.
-const ALWAYS_SKIP = new Set(["SUMMARY.md", "public-pages.json"]);
+const PUBLIC_TAG = "public";
 
-function loadConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    console.error(`Missing config: ${CONFIG_PATH}`);
-    process.exit(1);
-  }
-  const raw = fs.readFileSync(CONFIG_PATH, "utf8");
-  const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed.publicPages)) {
-    console.error(`public-pages.json must have a "publicPages" array.`);
-    process.exit(1);
-  }
-  return new Set(parsed.publicPages);
+// SUMMARY.md defines page order/tree per space and is hand-maintained
+// separately (the public space may reasonably have a different,
+// shorter table of contents). README.md is each space's own homepage
+// and is also left alone by this script - edit each space's README
+// directly if you want it to say something different.
+const ALWAYS_SKIP = new Set(["SUMMARY.md", "README.md"]);
+
+function parseFrontmatterTags(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!match) return [];
+  const frontmatter = match[1];
+  // crude but sufficient YAML list parse for a "tags:" block, e.g.:
+  // tags:
+  //   - public
+  //   - beta
+  const tagsBlockMatch = frontmatter.match(/tags:\n((?:\s*-\s*.+\n?)+)/);
+  if (!tagsBlockMatch) return [];
+  return tagsBlockMatch[1]
+    .split("\n")
+    .map((line) => line.replace(/^\s*-\s*/, "").trim())
+    .filter(Boolean);
 }
 
 function main() {
@@ -56,94 +71,87 @@ function main() {
     fs.mkdirSync(PUBLIC_DIR, { recursive: true });
   }
 
-  const publicPages = loadConfig();
-
-  const allInternalFiles = fs
+  const internalFiles = fs
     .readdirSync(INTERNAL_DIR)
     .filter((f) => f.endsWith(".md") && !ALWAYS_SKIP.has(f));
 
+  const publicTagged = [];
+  const notPublicTagged = [];
   let driftCount = 0;
-  let leakDetected = false;
-  const missingFromInternal = [];
 
-  // 1. Sync every file listed in public-pages.json that exists internally
-  for (const file of publicPages) {
+  for (const file of internalFiles) {
     const sourcePath = path.join(INTERNAL_DIR, file);
-    if (!fs.existsSync(sourcePath)) {
-      missingFromInternal.push(file);
-      console.warn(
-        `[WARN]  ${file} is listed in public-pages.json but doesn't exist in acme-corp-internal/`
-      );
-      continue;
-    }
-
     const content = fs.readFileSync(sourcePath, "utf8");
-    const targetPath = path.join(PUBLIC_DIR, file);
-    const alreadyMatches =
-      fs.existsSync(targetPath) &&
-      fs.readFileSync(targetPath, "utf8") === content;
+    const tags = parseFrontmatterTags(content);
+    const isPublic = tags.includes(PUBLIC_TAG);
 
-    if (!alreadyMatches) {
-      driftCount++;
-      console.log(
-        `${CHECK_ONLY ? "[DRIFT]" : "[SYNC] "} ${file} ${
-          fs.existsSync(targetPath) ? "(updated)" : "(new)"
-        }`
-      );
-      if (!CHECK_ONLY) {
-        fs.writeFileSync(targetPath, content, "utf8");
+    if (isPublic) {
+      publicTagged.push(file);
+      const targetPath = path.join(PUBLIC_DIR, file);
+      const alreadyMatches =
+        fs.existsSync(targetPath) &&
+        fs.readFileSync(targetPath, "utf8") === content;
+
+      if (!alreadyMatches) {
+        driftCount++;
+        console.log(
+          `${CHECK_ONLY ? "[DRIFT]" : "[SYNC] "} ${file} (tags: ${tags.join(", ")}) ${
+            fs.existsSync(targetPath) ? "(updated)" : "(new)"
+          }`
+        );
+        if (!CHECK_ONLY) {
+          fs.writeFileSync(targetPath, content, "utf8");
+        }
+      } else {
+        console.log(`[OK]    ${file} (already in sync)`);
       }
     } else {
-      console.log(`[OK]    ${file} (already in sync)`);
+      notPublicTagged.push(file);
+      console.log(
+        `[SKIP]  ${file} (tags: ${tags.length ? tags.join(", ") : "none"} — not tagged '${PUBLIC_TAG}')`
+      );
     }
   }
 
-  // 2. Report internal-only files, for visibility
-  const internalOnly = allInternalFiles.filter((f) => !publicPages.has(f));
-  for (const file of internalOnly) {
-    console.log(`[SKIP]  ${file} (not in public-pages.json, staff-only)`);
-  }
-
-  // 3. Safety net: flag any file sitting in acme-corp-public/ that is
-  //    NOT in public-pages.json — this catches manual copy mistakes or
-  //    leftover files from before a page was removed from the list.
+  // Removal pass: any file sitting in acme-corp-public/ that no longer
+  // corresponds to a public-tagged internal file gets deleted. This
+  // covers two cases: (1) a page was untagged from "public" back to
+  // internal/private, and (2) a page was removed from acme-corp-internal/
+  // entirely. Both should result in the public copy disappearing too,
+  // not silently persisting as stale/leaked content.
+  const removedFiles = [];
   if (fs.existsSync(PUBLIC_DIR)) {
     const publicFiles = fs
       .readdirSync(PUBLIC_DIR)
       .filter((f) => f.endsWith(".md") && !ALWAYS_SKIP.has(f));
     for (const file of publicFiles) {
-      if (!publicPages.has(file)) {
-        leakDetected = true;
-        console.error(
-          `[LEAK!] ${file} exists in acme-corp-public/ but is NOT listed in public-pages.json — remove it manually and investigate how it got there.`
+      const stillPublic = publicTagged.includes(file);
+      if (!stillPublic) {
+        removedFiles.push(file);
+        console.log(
+          `${CHECK_ONLY ? "[WOULD REMOVE]" : "[REMOVE]"} ${file} — no longer tagged '${PUBLIC_TAG}' in acme-corp-internal/`
         );
+        if (!CHECK_ONLY) {
+          fs.unlinkSync(path.join(PUBLIC_DIR, file));
+        }
       }
     }
   }
 
   console.log("\n--- Summary ---");
-  console.log(`Public pages (per config): ${publicPages.size}`);
-  console.log(`Internal-only pages:       ${internalOnly.length}`);
-  console.log(`Drifted/synced:            ${driftCount}`);
-  if (missingFromInternal.length) {
-    console.log(`Missing from internal:     ${missingFromInternal.length}`);
-  }
+  console.log(`Public-tagged pages: ${publicTagged.length}`);
+  console.log(`Not public-tagged:   ${notPublicTagged.length}`);
+  console.log(`Drifted/synced:      ${driftCount}`);
+  console.log(`Removed (untagged):  ${removedFiles.length}`);
 
-  if (leakDetected) {
-    console.error(
-      "\nCRITICAL: one or more files exist in the public folder without being authorized in public-pages.json. Fix before publishing."
-    );
-    process.exit(2);
-  }
-
-  if (CHECK_ONLY && driftCount > 0) {
+  if (CHECK_ONLY && (driftCount > 0 || removedFiles.length > 0)) {
     console.log(
-      "\nDrift detected. Run without --check to sync, or review changes above."
+      "\nChanges pending. Run without --check to apply, or review above."
     );
     process.exit(1);
   }
 
-  console.log(CHECK_ONLY ? "\nNo drift detected." : "\nSync complete.");
+  console.log(CHECK_ONLY ? "\nNo changes needed." : "\nSync complete.");
 }
 
 main();
