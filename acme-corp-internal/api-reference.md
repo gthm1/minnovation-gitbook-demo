@@ -1,8 +1,3 @@
----
-tags:
-  - public
----
-
 # API Reference
 
 Integration reference for the AlphaX XVision API. All endpoints require an API key, issued during onboarding.

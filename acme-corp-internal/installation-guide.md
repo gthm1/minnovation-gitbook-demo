@@ -1,8 +1,3 @@
----
-tags:
-  - public
----
-
 # Installation Guide
 
 Setup instructions for AlphaX XVision camera and edge devices.
