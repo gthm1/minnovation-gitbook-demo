@@ -4,3 +4,4 @@
 * [Getting Started](getting-started.md)
 
 * [Account Notes](account-notes.md)
+* [Troubleshooting](troubleshooting.md)
