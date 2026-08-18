@@ -1,3 +1,8 @@
+---
+tags:
+  - public
+---
+
 # API Reference
 
 Integration reference for the Xmesh API. All endpoints require an API key, issued during onboarding.

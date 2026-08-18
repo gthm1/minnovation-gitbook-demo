@@ -1,3 +1,8 @@
+---
+tags:
+  - public
+---
+
 # Troubleshooting
 
 Common issues and fixes for your Xmesh deployment.
