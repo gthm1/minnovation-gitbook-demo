@@ -1,6 +1,6 @@
 # Getting Started
 
-Welcome to your AlphaX XVision documentation portal.
+Welcome to your AlphaX XVision documentation portal. Edit - 1
 
 This space covers everything you need to get your XVision video analytics deployment up and running, from initial setup through to ongoing API integration.
 
@@ -16,12 +16,12 @@ AlphaX XVision is Minnovation's video analytics platform, used for real-time mon
 
 ## Account summary
 
-| Field | Value |
-|-------|-------|
-| Account | Acme Corp |
-| Product | AlphaX XVision |
+| Field    | Value               |
+| -------- | ------------------- |
+| Account  | Acme Corp           |
+| Product  | AlphaX XVision      |
 | Use case | Mobility monitoring |
-| Region | AU-East |
+| Region   | AU-East             |
 
 ## Getting support
 
