@@ -1,2 +1,4 @@
 - tag: test-tag
   label: test-tag
+- tag: public
+  label: public
