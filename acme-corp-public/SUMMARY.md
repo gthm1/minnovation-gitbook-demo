@@ -3,4 +3,4 @@
 * [Acme Corp](README.md)
 * [Account Notes](account-notes.md)
 * [Getting Started](getting-started.md)
-* [Troubleshooting](troubleshooting/README.md)
+* [Troubleshooting](troubleshooting.md)
