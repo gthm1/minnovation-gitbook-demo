@@ -307,6 +307,48 @@ function syncCustomer(customer) {
 
   const log = { drift: 0, removed: [] };
 
+  // The space root's own README.md is handled separately from the rest
+  // of the tree (walk() deliberately skips it, since at the top level
+  // it's the space's homepage, not a plain child page). Some spaces use
+  // it purely as boilerplate; others (like Beta Industries here) put
+  // real, taggable content directly in it - e.g. "Getting Started" IS
+  // the homepage. Either way, its own "public" tag decides whether its
+  // real content gets copied. If it's not public-tagged, the public
+  // space still needs *some* README.md to exist, so a minimal fallback
+  // is written instead of leaving the destination without a homepage.
+  const rootReadmePath = path.join(internalDir, "README.md");
+  const rootReadmeTargetPath = path.join(publicDir, "README.md");
+  let rootReadmeIsPublic = false;
+  if (fs.existsSync(rootReadmePath)) {
+    const rootContent = fs.readFileSync(rootReadmePath, "utf8");
+    const rootTags = parseFrontmatterTags(rootContent);
+    rootReadmeIsPublic = rootTags.includes(PUBLIC_TAG);
+    if (rootReadmeIsPublic) {
+      keepPaths.add("README.md");
+      const alreadyMatches =
+        fs.existsSync(rootReadmeTargetPath) &&
+        fs.readFileSync(rootReadmeTargetPath, "utf8") === rootContent;
+      if (!alreadyMatches) {
+        log.drift++;
+        console.log(
+          `${CHECK_ONLY ? "[DRIFT]" : "[SYNC] "} README.md ${
+            fs.existsSync(rootReadmeTargetPath) ? "(updated)" : "(new)"
+          }`
+        );
+        if (!CHECK_ONLY) fs.writeFileSync(rootReadmeTargetPath, rootContent, "utf8");
+      } else {
+        console.log("[OK]    README.md (already in sync)");
+      }
+    }
+  }
+  if (!rootReadmeIsPublic && !fs.existsSync(rootReadmeTargetPath)) {
+    const fallback = `# ${customer.label}\n`;
+    console.log(
+      "[INFO]  README.md not tagged 'public' - writing a minimal placeholder homepage"
+    );
+    if (!CHECK_ONLY) fs.writeFileSync(rootReadmeTargetPath, fallback, "utf8");
+  }
+
   copyPublicTree(publicTree, internalDir, publicDir, log);
 
   const currentPublicPaths = collectAllExistingPublicPaths(publicDir);
