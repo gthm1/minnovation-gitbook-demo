@@ -1,0 +1,10 @@
+{
+  "_comment": "Filenames listed here (relative to acme-corp-internal/) are the ONLY pages synced to acme-corp-public/. Everything else in acme-corp-internal/ stays internal-only. Update this list whenever a new public-facing page is added.",
+  "publicPages": [
+    "README.md",
+    "getting-started.md",
+    "api-reference.md",
+    "installation-guide.md",
+    "troubleshooting.md"
+  ]
+}
