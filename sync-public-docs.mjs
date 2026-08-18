@@ -114,11 +114,11 @@ function main() {
   }
 
   // Removal pass: any file sitting in acme-corp-public/ that no longer
-  // corresponds to a public-tagged internal file gets deleted. This
-  // covers two cases: (1) a page was untagged from "public" back to
-  // internal/private, and (2) a page was removed from acme-corp-internal/
-  // entirely. Both should result in the public copy disappearing too,
-  // not silently persisting as stale/leaked content.
+  // corresponds to a public-tagged internal file gets deleted, and its
+  // entry is also stripped from acme-corp-public/SUMMARY.md. Deleting
+  // just the .md file is not enough - GitBook follows SUMMARY.md as the
+  // table of contents, so a stale entry there will keep showing the old
+  // page even after its file is gone.
   const removedFiles = [];
   if (fs.existsSync(PUBLIC_DIR)) {
     const publicFiles = fs
@@ -134,6 +134,58 @@ function main() {
         if (!CHECK_ONLY) {
           fs.unlinkSync(path.join(PUBLIC_DIR, file));
         }
+      }
+    }
+  }
+
+  // Keep acme-corp-public/SUMMARY.md in sync with whatever files are
+  // actually present after the above sync/removal pass, preserving the
+  // existing line order for files that remain, and appending any newly
+  // public-tagged file that isn't listed yet.
+  const summaryPath = path.join(PUBLIC_DIR, "SUMMARY.md");
+  if (fs.existsSync(summaryPath)) {
+    const summaryContent = fs.readFileSync(summaryPath, "utf8");
+    const lines = summaryContent.split("\n");
+    const linkLineRegex = /^\*\s*\[([^\]]+)\]\(([^)]+)\)\s*$/;
+
+    const keptLines = [];
+    const referencedFiles = new Set();
+
+    for (const line of lines) {
+      const match = line.match(linkLineRegex);
+      if (!match) {
+        keptLines.push(line); // headings, blank lines, README link, etc.
+        continue;
+      }
+      const [, , linkedFile] = match;
+      if (linkedFile === "README.md" || publicTagged.includes(linkedFile)) {
+        keptLines.push(line);
+        referencedFiles.add(linkedFile);
+      } else {
+        console.log(
+          `${CHECK_ONLY ? "[WOULD REMOVE FROM SUMMARY]" : "[REMOVE FROM SUMMARY]"} ${linkedFile}`
+        );
+      }
+    }
+
+    for (const file of publicTagged) {
+      if (!referencedFiles.has(file)) {
+        const title = file
+          .replace(/\.md$/, "")
+          .replace(/-/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        keptLines.push(`* [${title}](${file})`);
+        console.log(
+          `${CHECK_ONLY ? "[WOULD ADD TO SUMMARY]" : "[ADD TO SUMMARY]"} ${file}`
+        );
+      }
+    }
+
+    const newSummary = keptLines.join("\n");
+    if (newSummary !== summaryContent) {
+      driftCount++;
+      if (!CHECK_ONLY) {
+        fs.writeFileSync(summaryPath, newSummary, "utf8");
       }
     }
   }
