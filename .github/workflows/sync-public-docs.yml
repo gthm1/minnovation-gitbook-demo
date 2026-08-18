@@ -40,11 +40,17 @@ jobs:
         run: |
           git config user.name "docs-sync-bot"
           git config user.email "docs-sync-bot@users.noreply.github.com"
-          git add -- '*-public'
+          # Stage every folder ending in "-public" that actually exists,
+          # rather than relying on a shell glob (which git add does not
+          # expand the way "*-internal"/"*-public" naming might suggest).
+          for dir in *-public/; do
+            if [ -d "$dir" ]; then
+              git add -- "$dir"
+            fi
+          done
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
             git commit -m "Auto-sync public docs (all customers)"
             git push
           fi
-
