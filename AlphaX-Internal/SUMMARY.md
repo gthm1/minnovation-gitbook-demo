@@ -1,3 +1,7 @@
 # Table of contents
 
-* [Page](README.md)
+* [Getting Started](README.md)
+* [API Reference](api-reference.md)
+* [Troubleshooting](troubleshooting.md)
+* [Account Notes](account-notes.md)
+* [Support History](support-history.md)
