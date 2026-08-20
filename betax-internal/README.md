@@ -1,3 +1,8 @@
+---
+tags:
+  - public
+---
+
 # Getting Started
 
 Welcome to your AlphaX Cloud documentation portal.
